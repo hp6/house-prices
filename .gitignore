@@ -1,3 +1,4 @@
-.ipynb_checkpoints
 .py[ca]
-checkpoint.ipynb
+.ipynb_checkpoints
+*checkpoint.ipynb
+__pycache__
