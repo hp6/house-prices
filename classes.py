@@ -17,6 +17,25 @@ class MasVnrImputer(BaseEstimator, TransformerMixin):
         X.loc[X["MasVnrArea"].isnull(), "MasVnrArea"] = self.area_fill_val
         return X
 
+class ConstantImputer(BaseEstimator, TransformerMixin):
+    def __init__(self, string_fill_val="NA", number_fill_val=0, columns=[]):
+        self.string_fill_val = string_fill_val
+        self.number_fill_val = number_fill_val
+        self.columns = columns
+    
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        X = X.copy()
+        str_col = X[self.columns].select_dtypes(include=object)
+        num_col = X[self.columns].select_dtypes(include="number")
+
+        X[str_col].fillna(self.string_fill_val, inplace=True)
+        X[num_col].fillna(self.number_fill_val, inplace=True)
+        print(X.head())
+        return X
+
 class DataFrameImputer(BaseEstimator, TransformerMixin):
     def __init__(self, strategy="mean", columns=[]):
         self.strategy = strategy
