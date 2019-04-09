@@ -28,12 +28,13 @@ class ConstantImputer(BaseEstimator, TransformerMixin):
 
     def transform(self, X, y=None):
         X = X.copy()
-        str_col = X[self.columns].select_dtypes(include=object)
-        num_col = X[self.columns].select_dtypes(include="number")
-
-        X[str_col].fillna(self.string_fill_val, inplace=True)
-        X[num_col].fillna(self.number_fill_val, inplace=True)
-        print(X.head())
+        str_col = X[self.columns].select_dtypes(include=object).columns
+        num_col = X[self.columns].select_dtypes(include="number").columns
+        # print(str_col)
+        X[str_col] = X[str_col].fillna(self.string_fill_val)
+        X[num_col] = X[num_col].fillna(self.number_fill_val)
+        # print(X.head())
+        # print(X["PoolQC"])
         return X
 
 class DataFrameImputer(BaseEstimator, TransformerMixin):

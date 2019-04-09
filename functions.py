@@ -9,3 +9,10 @@ def unique_values(df):
     for column in df:
         unique_values.append(df[column].unique())
     return unique_values
+
+def columns_with_missing_values(df):
+    miss_val_columns = []
+    for col in df:
+        if df[col].isnull().values.any():
+            miss_val_columns.append(col)
+    return miss_val_columns
