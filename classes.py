@@ -3,38 +3,58 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import SimpleImputer
 
+import functions as f
+
 class MasVnrImputer(BaseEstimator, TransformerMixin):
-    def __init__(self, type_fill_val="None", area_fill_val=0):
-        self.type_fill_val = type_fill_val
-        self.area_fill_val = area_fill_val
+    def __init__(self):
+        pass
     
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
         X = X.copy()
-        X.loc[X["MasVnrType"].isnull(), "MasVnrType"] = self.type_fill_val
-        X.loc[X["MasVnrArea"].isnull(), "MasVnrArea"] = self.area_fill_val
+        mas_vnr_types = f.unique_values(X[["MasVnrType"]])
+        print(mas_vnr_types)
+        for mas_vnr_type in mas_vnr_types:
+            mean = X.loc[X["MasVnrType"] == mas_vnr_type, "MasVnrArea"].mean()
+            X.loc[X["MasVnrArea"].isnull(), "MasVnrArea"] = mean
         return X
 
-class ConstantImputer(BaseEstimator, TransformerMixin):
-    def __init__(self, string_fill_val="NA", number_fill_val=0, columns=[]):
-        self.string_fill_val = string_fill_val
-        self.number_fill_val = number_fill_val
+class NaCatImputer(BaseEstimator, TransformerMixin):
+    def __init__(self, fill_val="NA",  columns=[]):
+        self.fill_val = fill_val
         self.columns = columns
     
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
-        X = X.copy()
+        X[self.columns] = X[self.columns].fillna(self.fill_val)
+        # print(X.head())
+        # print(X["PoolQC"])
+        return X
+
+class ConstantImputer(BaseEstimator, TransformerMixin):
+    def __init__(self, string_fill_val="NA", number_fill_val=0, columns=[], inplace=False):
+        self.string_fill_val = string_fill_val
+        self.number_fill_val = number_fill_val
+        self.columns = columns
+        self.inplace = inplace
+    
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        if not self.inplace:
+            X = X.copy()
         str_col = X[self.columns].select_dtypes(include=object).columns
         num_col = X[self.columns].select_dtypes(include="number").columns
         # print(str_col)
-        X[str_col] = X[str_col].fillna(self.string_fill_val)
-        X[num_col] = X[num_col].fillna(self.number_fill_val)
-        # print(X.head())
-        # print(X["PoolQC"])
+        for row in str_col:
+            X[row].fillna(self.string_fill_val, inplace=True)
+        for row in num_col:
+            X[row].fillna(self.number_fill_val, inplace=True)
         return X
 
 class DataFrameImputer(BaseEstimator, TransformerMixin):
