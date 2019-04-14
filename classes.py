@@ -9,6 +9,23 @@ from sklearn.impute import SimpleImputer
 import functions as f
 
 
+class ConflictingDataCleaner(BaseEstimator, TransformerMixin):
+    def __init__(self, inplace=False):
+        self.inplace = inplace
+    def fit(self, X, y=None):
+        return self
+    def transform(self, X, y=None):
+        if not self.inplace:
+            X = X.copy()
+        X.drop(X.loc[(X["MasVnrType"] == "None") & (X["MasVnrArea"] != 0)].index, inplace=True)
+        X.drop(X.loc[(X["MasVnrType"] == "BrkFace") & (X["MasVnrArea"] == 0)].index, inplace=True)
+        X.drop(X.loc[(X["MasVnrType"] == "Stone") & (X["MasVnrArea"] == 0)].index, inplace=True)
+        
+        X.loc[(X["BsmtExposure"].isnull()) & ~(X["BsmtQual"].isnull()), "BsmtExposure"] = "No"
+
+
+        return X
+
 class DataFrameOneHotEncoder(BaseEstimator, TransformerMixin):
     def __init__(self,columns=[], categories=[], sparse=False, handle_unknown="error"):
         self.columns = columns
@@ -76,6 +93,23 @@ class NaCatImputer(BaseEstimator, TransformerMixin):
         # print(X["PoolQC"])
         return X
 
+class GarageYrImputer(BaseEstimator, TransformerMixin):
+    def __init__(self, inplace=False):
+        self.inplace = inplace
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        if not self.inplace:
+            X = X.copy()
+
+        if ("GarageYrBlt" not in X.columns) or ("YearBuilt" not in X.columns):
+            print("GarageYrBlt or YearBuilt missing")
+            print(X.columns)
+        else:
+            X.loc[X["GarageYrBlt"].isnull(), "GarageYrBlt"] = X.loc[X["GarageYrBlt"].isnull(), "YearBuilt"]
+        return X
+
 class ConstantImputer(BaseEstimator, TransformerMixin):
     def __init__(self, string_fill_val="NA", number_fill_val=0, columns=[], inplace=False):
         self.string_fill_val = string_fill_val
@@ -99,25 +133,32 @@ class ConstantImputer(BaseEstimator, TransformerMixin):
         return X
 
 class DataFrameImputer(BaseEstimator, TransformerMixin):
-    def __init__(self, strategy="mean", columns=[]):
+    def __init__(self, strategy="mean", columns=[], inplace=False):
         self.strategy = strategy
         self.columns = columns
+        self.inplace = inplace
     
     def fit(self, X, y=None):
         self.imputer = SimpleImputer(strategy=self.strategy).fit(X.loc[:, self.columns])
         return self
 
     def transform(self, X, y=None):
-        X = X.copy()
+        if not self.inplace:
+            X = X.copy()
+
         X.loc[:, self.columns] = self.imputer.transform(X.loc[:, self.columns])
         return X
 
 class DataFrameSelector(BaseEstimator, TransformerMixin):
-    def __init__(self, columns):
+    def __init__(self, columns=[], inplace=False):
         self.columns = columns
+        self.inplace = inplace
     def fit(self, X, y=None):
         return self
     def transform(self, X):
+        if not self.inplace:
+            X = X.copy()
+
         if len(self.columns) == 1:
             return X[self.columns]
         else:
