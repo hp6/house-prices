@@ -5,6 +5,20 @@ from sklearn.impute import SimpleImputer
 
 import functions as f
 
+class NumToCat(BaseEstimator, TransformerMixin):
+    def __init__(self, columns=[], inplace=False):
+        self.columns = columns
+        self.inplace = inplace
+    
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        if not self.inplace:
+            X = X.copy()
+        X[self.columns] = X[self.columns].astype(dtype="object")
+        return X
+
 class MasVnrImputer(BaseEstimator, TransformerMixin):
     def __init__(self):
         pass
