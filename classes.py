@@ -1,9 +1,36 @@
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
+
+from sklearn.preprocessing import OneHotEncoder
+
 from sklearn.impute import SimpleImputer
 
 import functions as f
+
+
+class DataFrameOneHotEncoder(BaseEstimator, TransformerMixin):
+    def __init__(self,columns=[], categories=[], sparse=False, handle_unknown="error"):
+        self.columns = columns
+        self.categories = categories
+        self.sparse = sparse
+        self.handle_unknown = handle_unknown
+    
+    def fit(self, X, y=None):
+        if self.categories:
+            self.one_hot_encoder = OneHotEncoder(categories=self.categories, sparse=self.sparse, handle_unknown=self.handle_unknown).fit(X[self.columns])
+        else:
+            self.categories = f.unique_values(X[self.columns])
+            self.one_hot_encoder = OneHotEncoder(categories=self.categories, sparse=self.sparse, handle_unknown=self.handle_unknown).fit(X[self.columns])
+        return self
+
+    def transform(self, X, y=None):
+        ohe_matrix = self.one_hot_encoder.transform(X[self.columns])
+        column_names = []
+        for index, col_categories in enumerate(self.categories):
+            for cat in col_categories:
+                column_names.append("{}_{}".format(self.columns[index], str(cat))) 
+        return  pd.concat([X, pd.DataFrame(ohe_matrix, columns=column_names)], axis=1)
 
 class NumToCat(BaseEstimator, TransformerMixin):
     def __init__(self, columns=[], inplace=False):
