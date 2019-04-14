@@ -1,10 +1,13 @@
 import numpy as np
 import pandas as pd
+import joblib as jl
+
 from sklearn.base import BaseEstimator, TransformerMixin
 
 from sklearn.preprocessing import OneHotEncoder
 
 from sklearn.impute import SimpleImputer
+
 
 import functions as f
 
@@ -61,6 +64,31 @@ class NumToCat(BaseEstimator, TransformerMixin):
         if not self.inplace:
             X = X.copy()
         X[self.columns] = X[self.columns].astype(dtype="object")
+        return X
+
+class LotFrontageImputer(BaseEstimator, TransformerMixin):
+    def __init__(self, inplace=False):
+        self.inplace = inplace
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        if not self.inplace:
+            X = X.copy()
+
+        data = X.loc[X["LotFrontage"].isnull(), ["LotArea", "GarageArea"]].copy()
+
+        data.loc[:, "LotAreaSqrt"] = np.sqrt(data["LotArea"].values)
+        data.loc[:, "GarageAreaSqrt"] = np.sqrt(data["GarageArea"].values)
+
+        col_of_interest = ["LotArea", "LotAreaSqrt", "GarageArea", "GarageAreaSqrt"]
+        data = data[col_of_interest]
+        lot_area_regressor = jl.load("LotFrontageReg.joblib")
+
+        lot_area_pr = lot_area_regressor.predict(data)
+
+        X.loc[X["LotFrontage"].isnull(), "LotFrontage"] = lot_area_pr
+
         return X
 
 class MasVnrImputer(BaseEstimator, TransformerMixin):
