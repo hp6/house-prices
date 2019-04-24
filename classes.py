@@ -4,13 +4,32 @@ import joblib as jl
 
 from sklearn.base import BaseEstimator, TransformerMixin
 
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from sklearn.impute import SimpleImputer
+
+from sklearn.pipeline import Pipeline, FeatureUnion
+from sklearn.utils import Parallel, delayed
+
 
 
 import functions as f
 
+
+
+class NewFeaturesImputer(BaseEstimator, TransformerMixin):
+    def __init__(self, inplace=False):
+        self.inplace = inplace
+    def fit(self, X, y=None):
+        return self
+    def transform(self, X, y=None):
+        if not self.inplace:
+            X = X.copy()
+        X.loc[:, "LotAreaSqrt"] = np.sqrt(X["LotArea"].values)
+        X.loc[:, "GarageAreaSqrt"] = np.sqrt(X["GarageArea"].values)
+        X.loc[:, "AgeSold"] = X["YrSold"] - X["YearBuilt"]
+        X.loc[:, "RemodAge"] = X["YearRemodAdd"] - X["YearBuilt"]
+        return X
 
 class ConflictingDataCleaner(BaseEstimator, TransformerMixin):
     def __init__(self, inplace=False):
@@ -26,11 +45,38 @@ class ConflictingDataCleaner(BaseEstimator, TransformerMixin):
         
         X.loc[(X["BsmtExposure"].isnull()) & ~(X["BsmtQual"].isnull()), "BsmtExposure"] = "No"
 
-
         return X
 
+class DataFrameLogScaler(BaseEstimator, TransformerMixin):
+    def __init__(self, columns=[]):
+        self.columns = columns
+    
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        # scaled_df = pd.DataFrame(scaled_matrix, columns=self.columns)
+        X.loc[:, self.columns] = np.log1p(X.loc[:, self.columns])
+        return X
+
+class DataFrameScaler(BaseEstimator, TransformerMixin):
+    def __init__(self, columns=[]):
+        self.columns = columns
+    
+    def fit(self, X, y=None):
+        self.scaler = StandardScaler().fit(X[self.columns])
+        return self
+
+    def transform(self, X, y=None):
+        scaled_matrix = self.scaler.transform(X[self.columns])
+        # scaled_df = pd.DataFrame(scaled_matrix, columns=self.columns)
+        X[self.columns] = scaled_matrix
+        return X
+
+
+
 class DataFrameOneHotEncoder(BaseEstimator, TransformerMixin):
-    def __init__(self,columns=[], categories=[], sparse=False, handle_unknown="error"):
+    def __init__(self, columns=[], categories=[], sparse=False, handle_unknown="error"):
         self.columns = columns
         self.categories = categories
         self.sparse = sparse
@@ -49,8 +95,9 @@ class DataFrameOneHotEncoder(BaseEstimator, TransformerMixin):
         column_names = []
         for index, col_categories in enumerate(self.categories):
             for cat in col_categories:
-                column_names.append("{}_{}".format(self.columns[index], str(cat))) 
-        return  pd.concat([X, pd.DataFrame(ohe_matrix, columns=column_names)], axis=1)
+                column_names.append("{}_{}".format(self.columns[index], str(cat)))
+        X.drop(self.columns, axis=1, inplace=True)
+        return  pd.concat([X, pd.DataFrame(ohe_matrix, columns=column_names, index=X.index)], axis=1)
 
 class NumToCat(BaseEstimator, TransformerMixin):
     def __init__(self, columns=[], inplace=False):
@@ -76,18 +123,15 @@ class LotFrontageImputer(BaseEstimator, TransformerMixin):
         if not self.inplace:
             X = X.copy()
 
-        data = X.loc[X["LotFrontage"].isnull(), ["LotArea", "GarageArea"]].copy()
-
-        data.loc[:, "LotAreaSqrt"] = np.sqrt(data["LotArea"].values)
-        data.loc[:, "GarageAreaSqrt"] = np.sqrt(data["GarageArea"].values)
+        data = X.loc[X["LotFrontage"].isnull(), ["LotArea", "GarageArea", "LotAreaSqrt", "GarageAreaSqrt"]].copy()
 
         col_of_interest = ["LotArea", "LotAreaSqrt", "GarageArea", "GarageAreaSqrt"]
         data = data[col_of_interest]
-        lot_area_regressor = jl.load("LotFrontageReg.joblib")
+        lot_fr_regressor = jl.load("LotFrontageReg.joblib")
 
-        lot_area_pr = lot_area_regressor.predict(data)
+        lot_fr_pr = lot_fr_regressor.predict(data)
 
-        X.loc[X["LotFrontage"].isnull(), "LotFrontage"] = lot_area_pr
+        X.loc[X["LotFrontage"].isnull(), "LotFrontage"] = lot_fr_pr
 
         return X
 
@@ -101,7 +145,7 @@ class MasVnrImputer(BaseEstimator, TransformerMixin):
     def transform(self, X, y=None):
         X = X.copy()
         mas_vnr_types = f.unique_values(X[["MasVnrType"]])
-        print(mas_vnr_types)
+        # print(mas_vnr_types)
         for mas_vnr_type in mas_vnr_types:
             mean = X.loc[X["MasVnrType"] == mas_vnr_type, "MasVnrArea"].mean()
             X.loc[X["MasVnrArea"].isnull(), "MasVnrArea"] = mean
@@ -191,6 +235,3 @@ class DataFrameSelector(BaseEstimator, TransformerMixin):
             return X[self.columns]
         else:
             return X[self.columns]
-
-
-    
